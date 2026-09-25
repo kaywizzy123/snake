@@ -6,11 +6,16 @@ import {
   GameBounds,
   GestureEventType,
 } from "@/types/types";
+import { checkEatsFood } from "@/utils/checkEatsFood";
 import { checkGameOver } from "@/utils/checkGameOver";
+import { randomFoodPosition } from "@/utils/randomFoodPosition";
 import { useEffect, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { PanGestureHandler } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Food from "./Food";
+import GameOverScreen from "./GameOverScreen";
+import Header from "./Header";
 import Snake from "./Snake";
 
 const SNAKE_INITIAL_POSITION = [{ x: 5, y: 5 }];
@@ -26,6 +31,7 @@ export default function Game() {
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [gameBounds, setGameBounds] = useState<GameBounds | null>(null);
+  const [score, setScore] = useState<number>(0);
 
   // Derive the grid bounds from the measured size of the play area
   const handleLayout = (event: LayoutChangeEvent) => {
@@ -48,7 +54,7 @@ export default function Game() {
 
     // game over
     if (checkGameOver(snakeHead, gameBounds)) {
-      setIsGameOver((prev) => !prev);
+      setIsGameOver(true);
       return;
     }
 
@@ -74,8 +80,14 @@ export default function Game() {
     }
 
     //if eats food grow snake
-
-    setSnake([newHead, ...snake.slice(0, -1)]);
+    if (checkEatsFood(newHead, food, 2)) {
+      setFood(randomFoodPosition(gameBounds.xMax, gameBounds.yMax));
+      setSnake([newHead, ...snake]);
+      //get another position for the food
+      setScore((prevScore) => prevScore + SCORE_INCREMENT);
+    } else {
+      setSnake([newHead, ...snake.slice(0, -1)]);
+    }
   };
 
   useEffect(() => {
@@ -109,12 +121,37 @@ export default function Game() {
       }
     }
   };
+
+  const pauseGame = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const reloadGame = () => {
+    setSnake(SNAKE_INITIAL_POSITION);
+    setFood(FOOD_INITIAL_POSITION);
+    setIsGameOver(false);
+    setScore(0);
+    setDirection(Direction.Right);
+    setIsPaused(false);
+  };
+
   return (
     <>
       <PanGestureHandler onGestureEvent={handleGesture}>
         <SafeAreaView style={styles.container}>
+          <Header
+            isPaused={isPaused}
+            pauseGame={pauseGame}
+            reloadGame={reloadGame}
+          >
+            <Text style={styles.score}>{score}</Text>
+          </Header>
           <View style={styles.boundaries} onLayout={handleLayout}>
             <Snake snake={snake} />
+            <Food x={food.x} y={food.y} />
+            {isGameOver && (
+              <GameOverScreen score={score} onRestart={reloadGame} />
+            )}
           </View>
         </SafeAreaView>
       </PanGestureHandler>
@@ -134,5 +171,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     backgroundColor: COLORS.background,
+  },
+  score: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: COLORS.primary,
   },
 });
